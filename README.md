@@ -30,8 +30,8 @@
 | **Ethereum (EVM)** | ETH, BNB, Polygon, Avalanche и любые L2 сети. |
 | **Polkadot (DOT)** | Поддержка **Sr25519** и работа через Mnemonic (совместимость с Talisman/Polkadot.js). |
 | **Cosmos (ATOM)** | Генератор любых префиксов (Cosmos, Celestia, Osmosis, Dymension). |
-| **Solana (SOL)** | Стандартная BIP-44 генерация. |
-| **SUI Network** | Генерация ED25519 ключей для SUI. |
+| **Solana (SOL)** | Поддержка стандартов Phantom, Backpack, Solflare (`m/44'/501'/0'/0'`), Legacy-форматов и кастомных путей. |
+| **SUI Network** | Генерация ED25519 ключей (Blake2b) для SUI. |
 
 ---
 
@@ -100,6 +100,7 @@
 
 Проект использует минимальный набор проверенных библиотек:
 * `bip-utils` — основная криптография (BIP39/44/84/86).
+* `PyNaCl` — безопасная и стабильная математика кривой Ed25519 (для Solana).
 * `cryptography` — AES-GCM шифрование файлов.
 * `substrate-interface` — работа с экосистемой Polkadot.
 * `rich` & `questionary` — интерфейс.

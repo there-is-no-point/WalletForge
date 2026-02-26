@@ -179,7 +179,9 @@ def run_generator():
                     # Call the function with the appropriate arguments
                     w_keys = GeneratorClass.generate(**call_args)
                 except Exception as e:
-                    # If there's an error in key generation, skip to the next iteration
+                    print(f"Error in generate: {e}")
+                    import traceback
+                    traceback.print_exc()
                     continue
 
                 if "error" in w_keys: continue

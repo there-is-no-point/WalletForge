@@ -106,6 +106,7 @@ class NetworkGenerator:
 Проект жестко фиксирует версии библиотек для стабильности:
 * `bip_utils`
 * `cryptography`
+* `PyNaCl`
 * `rich`
 * `questionary`
 * `substrate-interface`
