@@ -70,3 +70,30 @@ class NetworkGenerator:
             "private_key": acc_obj.PrivateKey().ToWif(),
             "type": type_str
         }
+
+    @staticmethod
+    def validate(address):
+        """Проверка валидности Bitcoin адреса по формату."""
+        import re
+        # Native SegWit (bech32) — bc1q + 39 символов
+        if address.startswith("bc1q"):
+            if not re.match(r'^bc1q[a-z0-9]{38,42}$', address):
+                return False, "Невалидный Native SegWit формат"
+            return True, "OK"
+        # Taproot (bech32m) — bc1p + 58 символов
+        elif address.startswith("bc1p"):
+            if not re.match(r'^bc1p[a-z0-9]{58}$', address):
+                return False, "Невалидный Taproot формат"
+            return True, "OK"
+        # Legacy — начинается с 1, длина 25-34
+        elif address.startswith("1"):
+            if not re.match(r'^1[a-km-zA-HJ-NP-Z1-9]{24,33}$', address):
+                return False, "Невалидный Legacy формат"
+            return True, "OK"
+        # Nested SegWit — начинается с 3, длина 25-34
+        elif address.startswith("3"):
+            if not re.match(r'^3[a-km-zA-HJ-NP-Z1-9]{24,33}$', address):
+                return False, "Невалидный Nested SegWit формат"
+            return True, "OK"
+        else:
+            return False, f"Неизвестный формат адреса: {address[:6]}..."

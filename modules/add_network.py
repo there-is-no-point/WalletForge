@@ -27,8 +27,48 @@ class NetworkGenerator:
         }}
 """
 
+BTC_FORK_TEMPLATE = """from bip_utils import {bip_import}, {coins_import}, Bip44Changes
+import re
+
+class NetworkGenerator:
+    NAME = "{display_name}"
+    SYMBOL = "{symbol}"
+
+    @staticmethod
+    def generate(seed_bytes, config=None):
+        # Генерация для Bitcoin-форка {display_name}
+        bip_obj = {bip_class}.FromSeed(seed_bytes, {coins_import}.{enum_name})
+        acc_obj = bip_obj.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT).AddressIndex(0)
+
+        return {{
+            "address": acc_obj.PublicKey().ToAddress(),
+            "private_key": acc_obj.PrivateKey().ToWif()
+        }}
+
+    @staticmethod
+    def validate(address):
+        # Базовая проверка Base58Check адреса
+        if not address or len(address) < 25 or len(address) > 36:
+            return False, f"Невалидная длина: {{len(address)}}"
+        if not re.match(r'^[a-km-zA-HJ-NP-Z1-9]+$', address):
+            return False, "Невалидные Base58 символы"
+        return True, "OK"
+"""
+
+# Набор Bitcoin-форков, для которых нужен WIF вместо raw hex
+BTC_FORK_COINS = {
+    "BITCOIN", "BITCOIN_CASH", "BITCOIN_CASH_SLP", "BITCOIN_SV",
+    "LITECOIN", "DOGECOIN", "DASH", "ZCASH",
+    "BITCOIN_GOLD", "BITCOIN_CASH_TEST_NET", "BITCOIN_TEST_NET",
+    "LITECOIN_TEST_NET", "DOGECOIN_TEST_NET", "DASH_TEST_NET",
+    "ZCASH_TEST_NET",
+}
+
 CUSTOM_TEMPLATE = """from bip_utils import Bip44, Bip44Coins, Bip44Changes
-from bip_utils.bech32 import Bech32Encoder
+try:
+    from bip_utils.bech32 import Bech32Encoder
+except ImportError:
+    from bip_utils import Bech32Encoder
 import hashlib
 
 class NetworkGenerator:
@@ -177,8 +217,14 @@ def run_search_mode():
                                     style=ui_manager.custom_style).ask()
     if not symbol_input: return
 
+    # Автоопределение Bitcoin-форков
+    is_btc_fork = enum_name in BTC_FORK_COINS
+    if is_btc_fork:
+        print_info(f"Обнаружен Bitcoin-форк → приватный ключ будет в формате WIF")
+
     filename = f"{symbol_input.lower()}.py"
-    file_content = STANDARD_TEMPLATE.format(
+    template = BTC_FORK_TEMPLATE if is_btc_fork else STANDARD_TEMPLATE
+    file_content = template.format(
         display_name=display_name, symbol=symbol_input.upper(),
         enum_name=enum_name, bip_import="Bip44", bip_class="Bip44",
         coins_import="Bip44Coins"

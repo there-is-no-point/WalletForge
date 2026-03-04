@@ -73,3 +73,21 @@ class NetworkGenerator:
             "path": bip44_path,
             "type": f"Cosmos (ID: {coin_type})"
         }
+
+    @staticmethod
+    def validate(address, config=None):
+        """Проверка валидности Cosmos адреса (Bech32)."""
+        import re
+        prefix = config.get("prefix", "cosmos") if config else "cosmos"
+        # Адрес должен начинаться с ожидаемого префикса + "1"
+        expected_start = f"{prefix}1"
+        if not address.startswith(expected_start):
+            return False, f"Ожидается префикс '{expected_start}', получено: {address[:len(expected_start)+2]}"
+        # После префикса и "1" должны быть символы Bech32 (только a-z, 0-9, без 1, b, i, o)
+        data_part = address[len(expected_start):]
+        if not re.match(r'^[a-hj-np-z02-9]+$', data_part):
+            return False, "Невалидные Bech32 символы"
+        # Длина данных (20 байт RIPEMD160 → обычно 38-39 символов Bech32)
+        if len(data_part) < 30 or len(data_part) > 50:
+            return False, f"Невалидная длина данных: {len(data_part)}"
+        return True, "OK"

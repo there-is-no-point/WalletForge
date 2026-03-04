@@ -148,3 +148,18 @@ class NetworkGenerator:
         except Exception as e:
             ui_manager.print_error(f"Polkadot Gen Error: {e}")
             return {"error": str(e)}
+
+    @staticmethod
+    def validate(address, config=None):
+        """Проверка валидности SS58 адреса через substrate-interface."""
+        if not HAS_SUBSTRATE_LIB:
+            # Без библиотеки — базовая проверка длины
+            if len(address) < 46 or len(address) > 48:
+                return False, f"Невалидная длина SS58: {len(address)}"
+            return True, "OK (без глубокой проверки)"
+        try:
+            # SS58 decode проверяет чексумму автоматически
+            kp = Keypair(ss58_address=address)
+            return True, "OK"
+        except Exception as e:
+            return False, f"Невалидный SS58 адрес: {e}"

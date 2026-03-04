@@ -15,7 +15,7 @@ COLOR_ERROR = "#FF0000"  # Красный (Ошибки)
 COLOR_MUTED = "#808080"  # Серый (Инструкции)
 
 # --- 2. НАСТРОЙКИ ПРИЛОЖЕНИЯ ---
-APP_NAME = "KEY FORGE"
+APP_NAME = "WalletForge"
 AUTHOR_NICK = "there-is-no-point"
 
 # Описание без ссылок, только текст и цвет
@@ -79,3 +79,7 @@ def print_info(text):
 
 def print_step(text):
     console.print(f"\n[{COLOR_WARNING}]➤ {text}[/{COLOR_WARNING}]")
+
+
+def print_warning(text):
+    console.print(f"[bold {COLOR_WARNING}]⚠️  {text}[/bold {COLOR_WARNING}]")
