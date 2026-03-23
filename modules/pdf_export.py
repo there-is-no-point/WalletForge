@@ -38,121 +38,117 @@ def export_qr_pdf(data, output_path, title="Wallets"):
     - QR приватного ключа + текст ключа
     - Мнемоника (текстом)
 
-    По 2 кошелька на страницу A4.
+    По 1 кошельку на страницу A4. ДИНАМИЧЕСКИЙ РАСЧЕТ РАЗМЕРОВ.
     """
     w, h = A4
     c = canvas.Canvas(output_path, pagesize=A4)
 
     # Стили
-    bg_color = HexColor("#1a1a2e")
-    card_bg = HexColor("#16213e")
+    bg_color = HexColor("#16213e")
     accent = HexColor("#e94560")
+    label_color = HexColor("#00d2ff") # Яркий голубой цвет для заголовков секций
     text_color = HexColor("#ffffff")
-    dim_color = HexColor("#a0a0a0")
 
-    qr_size = 28 * mm
-    card_h = h / 2 - 20 * mm
-    margin = 15 * mm
+    margin_x = 10 * mm
 
     for idx, wallet in enumerate(data):
-        slot = idx % 2  # 0 = верхний, 1 = нижний
-        if slot == 0:
-            # Новая страница — фон
-            c.setFillColor(bg_color)
-            c.rect(0, 0, w, h, fill=1, stroke=0)
+        # Сплошная заливка страницы
+        c.setFillColor(bg_color)
+        c.rect(0, 0, w, h, fill=1, stroke=0)
 
-        # Позиция карточки
-        card_y = h - margin - (slot + 1) * card_h - slot * 10 * mm
-
-        # Фон карточки
-        c.setFillColor(card_bg)
-        c.roundRect(margin, card_y, w - 2 * margin, card_h, 8, fill=1, stroke=0)
-
-        # Заголовок
-        cy = card_y + card_h - 12 * mm
+        # Заголовок страницы
+        cy = h - 15 * mm
         c.setFillColor(accent)
-        c.setFont("Helvetica-Bold", 14)
+        c.setFont("Helvetica-Bold", 18)
         network = wallet.get("network", "???")
-        c.drawString(margin + 8 * mm, cy, f"#{idx + 1}  {network}")
+        title_text = f"#{idx + 1}  {network}"
+        c.drawCentredString(w / 2.0, cy, title_text)
 
-        # --- ADDRESS ---
-        cy -= 8 * mm
-        c.setFillColor(dim_color)
-        c.setFont("Helvetica", 8)
-        c.drawString(margin + 8 * mm, cy, "ADDRESS")
+        # Сбор всех блоков данных кошелька
+        blocks = []
+        if wallet.get("address"):
+            blocks.append(("PUBLIC ADDRESS", wallet["address"]))
+        if wallet.get("private_key"):
+            blocks.append(("PRIVATE KEY", wallet["private_key"]))
 
-        addr = wallet.get("address", "")
-        cy -= 5 * mm
-        c.setFillColor(text_color)
-        c.setFont("Courier", 7)
-        # Если адрес длинный — разбиваем на 2 строки
-        if len(addr) > 50:
-            c.drawString(margin + 8 * mm + qr_size + 4 * mm, cy + 4 * mm, addr[:50])
-            c.drawString(margin + 8 * mm + qr_size + 4 * mm, cy - 1 * mm, addr[50:])
-        else:
-            c.drawString(margin + 8 * mm + qr_size + 4 * mm, cy + 2 * mm, addr)
-
-        # QR адреса
-        if addr:
-            qr_img = _make_qr_image(addr)
-            _draw_qr(c, qr_img, margin + 8 * mm, cy - 18 * mm, qr_size)
-
-        # --- PRIVATE KEY ---
-        cy -= 28 * mm
-        c.setFillColor(dim_color)
-        c.setFont("Helvetica", 8)
-        c.drawString(margin + 8 * mm, cy, "PRIVATE KEY")
-
-        pk = wallet.get("private_key", "")
-        cy -= 5 * mm
-        c.setFillColor(text_color)
-        c.setFont("Courier", 6)
-        if len(pk) > 60:
-            c.drawString(margin + 8 * mm + qr_size + 4 * mm, cy + 4 * mm, pk[:60])
-            c.drawString(margin + 8 * mm + qr_size + 4 * mm, cy - 1 * mm, pk[60:])
-        else:
-            c.drawString(margin + 8 * mm + qr_size + 4 * mm, cy + 2 * mm, pk)
-
-        # QR ключа - для приватников префиксы обычно не нужны
-        if pk:
-            qr_img = _make_qr_image(pk)
-            _draw_qr(c, qr_img, margin + 8 * mm, cy - 18 * mm, qr_size)
-
-        # --- MNEMONIC ---
-        cy -= 28 * mm
-        mn = wallet.get("mnemonic", "")
-        if mn:
-            c.setFillColor(dim_color)
-            c.setFont("Helvetica", 8)
-            c.drawString(margin + 8 * mm, cy, "MNEMONIC")
-            cy -= 5 * mm
-            c.setFillColor(text_color)
-            c.setFont("Courier", 6.5)
+        # Специфичные поля для сетей
+        if wallet.get("view_key"):
+            blocks.append(("PRIVATE VIEW KEY", wallet["view_key"]))
             
-            # Текст мнемоники правее от QR кода
-            words = mn.split()
-            line = ""
-            text_cy = cy + 4 * mm
-            for word in words:
-                if len(line) + len(word) + 1 > 55:
-                    c.drawString(margin + 8 * mm + qr_size + 4 * mm, text_cy, line)
-                    text_cy -= 4.5 * mm
-                    line = word
-                else:
-                    line = f"{line} {word}".strip()
-            if line:
-                c.drawString(margin + 8 * mm + qr_size + 4 * mm, text_cy, line)
-                
-            # QR мнемоники
-            qr_img = _make_qr_image(mn)
-            _draw_qr(c, qr_img, margin + 8 * mm, cy - 18 * mm, qr_size)
+        if wallet.get("private_key_hex"):
+            blocks.append(("PRIVATE KEY HEX", wallet["private_key_hex"]))
 
-        # Если нижний слот заполнен — переход на новую страницу
-        if slot == 1:
+        if wallet.get("mnemonic"):
+            blocks.append(("SEED PHRASE / MNEMONIC", wallet["mnemonic"]))
+        if wallet.get("staking_key"):
+            blocks.append(("STAKING KEY", wallet["staking_key"]))
+
+        if not blocks:
             c.showPage()
+            continue
 
-    # Если последняя страница имеет только 1 кошелёк
-    if len(data) % 2 == 1:
+        # Математика пространства
+        # Доступная высота = от нижнего края заголовка до нижней границы страницы (10mm)
+        available_h = (cy - 10 * mm) - 10 * mm 
+        num_blocks = len(blocks)
+        
+        # Высота, доступная для каждого блока на листе
+        block_h = available_h / num_blocks
+
+        # QR код не может быть больше высоты блока минус отступы на текст (15mm)
+        # Также ограничиваем максимальный размер QR до 47mm
+        max_qr_h = block_h - 15 * mm
+        qr_size = min(47 * mm, max_qr_h)
+
+        cy -= 15 * mm # Начальный Y для первого блока
+        
+        # Расчет ширины текста для переноса строк 
+        # Courier 12 = ~7.2 points width per char
+        text_x = margin_x + qr_size + 6 * mm
+        available_text_w = w - text_x - margin_x
+        chars_per_line = int(available_text_w / 7.2)
+
+        for title_label, val in blocks:
+            block_top = cy
+            
+            c.setFillColor(label_color)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(margin_x, block_top, title_label)
+            
+            qr_y = block_top - 5 * mm - qr_size
+            text_y = block_top - 10 * mm
+            
+            c.setFillColor(text_color)
+            c.setFont("Courier", 12)
+            
+            # Текст справа от QR. Разбиваем на строки
+            if title_label == "SEED PHRASE / MNEMONIC":
+                words = val.split()
+                line = ""
+                cur_y = text_y
+                for word in words:
+                    if len(line) + len(word) + 1 > chars_per_line - 6: 
+                        c.drawString(text_x, cur_y, line)
+                        cur_y -= 6 * mm
+                        line = word
+                    else:
+                        line = f"{line} {word}".strip()
+                if line:
+                    c.drawString(text_x, cur_y, line)
+            else:
+                chunk = chars_per_line
+                cur_y = text_y
+                for i in range(0, len(val), chunk):
+                    c.drawString(text_x, cur_y, val[i:i + chunk])
+                    cur_y -= 6 * mm
+
+            # Рисуем QR код
+            qr_img = _make_qr_image(val)
+            _draw_qr(c, qr_img, margin_x, qr_y, qr_size)
+            
+            # Сдвигаем Y для следующего блока 
+            cy -= block_h
+
         c.showPage()
 
     c.save()
@@ -229,9 +225,9 @@ def export_paper_wallet(data, output_path):
         cc.drawString(tx, tcy, "ADDRESS")
         tcy -= 6 * mm
         cc.setFillColor(white)
-        cc.setFont("Courier", 8)
+        cc.setFont("Courier-Bold", 9)
         # Разбиваем адрес на строки
-        chunk = 52
+        chunk = 46
         for i in range(0, len(addr), chunk):
             cc.drawString(tx, tcy, addr[i:i + chunk])
             tcy -= 5 * mm
@@ -278,11 +274,11 @@ def export_paper_wallet(data, output_path):
         cc.drawString(tx, tcy, "PRIVATE KEY")
         tcy -= 6 * mm
         cc.setFillColor(white)
-        cc.setFont("Courier", 7)
-        chunk_pk = 60
+        cc.setFont("Courier-Bold", 9)
+        chunk_pk = 46
         for i in range(0, len(pk), chunk_pk):
             cc.drawString(tx, tcy, pk[i:i + chunk_pk])
-            tcy -= 4.5 * mm
+            tcy -= 5 * mm
 
         # View Key (если есть, для XMR)
         if vk:
@@ -292,10 +288,10 @@ def export_paper_wallet(data, output_path):
             cc.drawString(tx, tcy, "VIEW KEY")
             tcy -= 6 * mm
             cc.setFillColor(white)
-            cc.setFont("Courier", 7)
+            cc.setFont("Courier-Bold", 9)
             for i in range(0, len(vk), chunk_pk):
                 cc.drawString(tx, tcy, vk[i:i + chunk_pk])
-                tcy -= 4.5 * mm
+                tcy -= 5 * mm
 
         # Мнемоника (под QR)
         if mn:
@@ -305,13 +301,13 @@ def export_paper_wallet(data, output_path):
             cc.drawString(margin + 8 * mm, mn_y, "MNEMONIC")
             mn_y -= 5 * mm
             cc.setFillColor(white)
-            cc.setFont("Courier", 7)
+            cc.setFont("Courier-Bold", 9)
             words = mn.split()
             line = ""
             for word in words:
-                if len(line) + len(word) + 1 > 90:
+                if len(line) + len(word) + 1 > 70:
                     cc.drawString(margin + 8 * mm, mn_y, line)
-                    mn_y -= 4 * mm
+                    mn_y -= 5 * mm
                     line = word
                 else:
                     line = f"{line} {word}".strip()

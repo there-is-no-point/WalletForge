@@ -45,7 +45,8 @@ def print_banner(extra_info=""):
     """
     Выводит ASCII заголовок и описание.
     """
-    console.clear()
+    from prompt_toolkit.shortcuts import clear
+    clear()
 
     # Генерируем ASCII баннер
     try:
@@ -63,6 +64,43 @@ def print_banner(extra_info=""):
         border_style=COLOR_MAIN,
         padding=(0, 2)
     ))
+    
+    # Если передана доп. информация (например, название модуля)
+    if extra_info:
+        console.print(f"\n[bold {COLOR_ACCENT}]=== {extra_info} ===[/bold {COLOR_ACCENT}]\n", justify="center")
+
+
+def print_breadcrumbs(path_string: str):
+    """
+    Очищает консоль и выводит компактную панель навигации (хлебные крошки).
+    Используется во всех дочерних меню для экономии места на экране.
+    """
+    from prompt_toolkit.shortcuts import clear
+    clear()
+    breadcrumb_text = f"🏠 [bold white]Главное меню[/bold white] ➔ [cyan]{path_string}[/cyan]"
+    console.print(Panel.fit(breadcrumb_text, border_style=COLOR_MAIN, padding=(0, 2)))
+    console.print()
+
+def print_config_card(state: dict):
+    """
+    Выводит таблицу текущих настроек генератора (Progressive Disclosure).
+    """
+    from rich.table import Table
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("Параметр", style=f"bold {COLOR_ACCENT}")
+    table.add_column("Значение", style="bold white")
+    
+    for key, value in state.items():
+        val_str = str(value)
+        if "Ожидание" in val_str:
+            table.add_row(key, f"[dim]{val_str}[/dim]")
+        elif val_str in ["Нет", "Отсутствует", "Не установлен"]:
+            table.add_row(key, f"[{COLOR_MUTED}]{val_str}[/{COLOR_MUTED}]")
+        else:
+            table.add_row(key, f"[{COLOR_MAIN}]{val_str}[/{COLOR_MAIN}]")
+            
+    console.print(Panel(table, expand=False, title="[bold white]⚙️ Конфигурация Генератора[/bold white]", border_style=COLOR_MAIN))
+    console.print()
 
 
 def print_success(text):

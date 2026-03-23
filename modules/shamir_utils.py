@@ -127,13 +127,25 @@ def run_shamir_menu():
     import questionary
     import ui_manager
     import time
+    from ui_manager import console
+    
+    while True:
+        try:
+            if _run_shamir_logic(questionary, ui_manager, time, console):
+                break
+        except KeyboardInterrupt:
+            console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат в меню Shamir...[/yellow]")
+            time.sleep(1)
+            continue
+
+def _run_shamir_logic(questionary, ui_manager, time, console):
     import glob
     import json
-    from ui_manager import console, print_info, print_success, print_error, print_warning
+    from ui_manager import print_info, print_success, print_error, print_warning
     from main import CSV_DIR, ENC_DIR, encrypt_data, decrypt_data
     
     console.clear()
-    ui_manager.print_banner("🧩 Разделение секрета (Shamir)")
+    ui_manager.print_breadcrumbs("🧩 Разделение секрета (Shamir)")
     
     action = questionary.select(
         "Что вы хотите сделать?",
@@ -146,14 +158,60 @@ def run_shamir_menu():
     ).ask()
     
     if not action or "Назад" in action:
-        return
+        return True
         
     if "Разбить" in action:
-        secret = questionary.password("Введите секрет (мнемоника, приватный ключ, пароль):", style=ui_manager.custom_style).ask()
-        if not secret: return
-        
-        total_str = questionary.text("На сколько всего частей разбить (N)?", default="5", style=ui_manager.custom_style).ask()
-        thresh_str = questionary.text("Сколько частей нужно для восстановления (M)?", default="3", style=ui_manager.custom_style).ask()
+        while True:
+            input_type = questionary.select(
+                "Как вы хотите ввести секрет?",
+                choices=[
+                    "⌨️  Скрытый ввод (скрывает символы, безопасно от посторонних глаз)",
+                    "📝 Открытый текст (видимый ввод, удобно для проверки текста)",
+                    "🔙 Назад"
+                ],
+                style=ui_manager.custom_style
+            ).ask()
+            
+            if not input_type or "Назад" in input_type:
+                return False
+                
+            if "Скрытый" in input_type:
+                secret = questionary.password("Введите секрет (мнемоника, приватный ключ, пароль):", style=ui_manager.custom_style).ask()
+            else:
+                secret = questionary.text("Введите секрет:", style=ui_manager.custom_style).ask()
+                
+            if secret is None:
+                import time
+                from ui_manager import console
+                console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору ввода...[/yellow]")
+                time.sleep(1)
+                console.clear()
+                continue
+                
+            if not secret:
+                print_error("Данные не введены (Секрет не может быть пустым).")
+                time.sleep(1)
+                continue
+            
+            total_str = questionary.text("На сколько всего частей разбить (N)?", default="5", style=ui_manager.custom_style).ask()
+            if total_str is None:
+                import time
+                from ui_manager import console
+                console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору ввода...[/yellow]")
+                time.sleep(1)
+                console.clear()
+                continue
+
+            thresh_str = questionary.text("Сколько частей нужно для восстановления (M)?", default="3", style=ui_manager.custom_style).ask()
+            if thresh_str is None:
+                import time
+                from ui_manager import console
+                console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору ввода...[/yellow]")
+                time.sleep(1)
+                console.clear()
+                continue
+                
+            break
         
         try:
             total = int(total_str)
@@ -195,8 +253,17 @@ def run_shamir_menu():
                 
             elif save_fmt and "Зашифрованные" in save_fmt:
                 pwd = questionary.password("Пароль для шифрования частей:", style=ui_manager.custom_style).ask()
+                
+                if pwd is None:
+                    import time
+                    from ui_manager import console
+                    console.print("\n[yellow]⚠ Действие отменено (Ctrl+C).[/yellow]")
+                    time.sleep(1)
+                    console.clear()
+                    return
+                    
                 if not pwd:
-                    print_error("Пароль не указан, сохранение отменено.")
+                    print_error("Данные не введены (Пароль не указан). Сохранение отменено.")
                 else:
                     ts = int(time.time())
                     save_dir = os.path.join(ENC_DIR, f"shamir_{ts}")
@@ -215,229 +282,276 @@ def run_shamir_menu():
             print_error(f"Ошибка при разделении: {e}")
             
     elif "Восстановить" in action:
-        # --- Выбор источника частей ---
-        source = questionary.select(
-            "Откуда загрузить части?",
-            choices=[
-                "📂 Из папки с файлами (.txt)",
-                "🔒 Из папки с зашифрованными файлами (.enc)",
-                "📁 Указать путь к папке вручную",
-                "⌨️  Ввести вручную (вставить из буфера)"
-            ],
-            style=ui_manager.custom_style
-        ).ask()
-        if not source: 
-            input("\nНажмите Enter...")
-            return
-            
-        shares_input = []
-        
-        if "txt" in source:
-            # Ищем папки shamir_* в CSV_DIR
-            shamir_dirs = sorted(glob.glob(os.path.join(CSV_DIR, "shamir_*")))
-            if not shamir_dirs:
-                print_error(f"Нет папок shamir_* в {CSV_DIR}")
-                input("\nНажмите Enter...")
-                return
-                
-            dir_choice = questionary.select(
-                "Выберите папку с частями:",
-                choices=[os.path.basename(d) for d in shamir_dirs],
+        while True:
+            # --- Выбор источника частей ---
+            source = questionary.select(
+                "Откуда загрузить части?",
+                choices=[
+                    "📂 Из папки с файлами (.txt)",
+                    "🔒 Из папки с зашифрованными файлами (.enc)",
+                    "📁 Указать путь к папке вручную",
+                    "⌨️  Ввести вручную (вставить из буфера)",
+                    "🔙 Назад"
+                ],
                 style=ui_manager.custom_style
             ).ask()
-            if not dir_choice:
-                input("\nНажмите Enter...")
-                return
-                
-            chosen_dir = os.path.join(CSV_DIR, dir_choice)
-            txt_files = sorted(glob.glob(os.path.join(chosen_dir, "*.txt")))
+            if not source or "Назад" in source: 
+                break
             
-            if not txt_files:
-                print_error("Папка не содержит .txt файлов.")
-                input("\nНажмите Enter...")
-                return
+            shares_input = []
             
-            # Показываем найденные файлы, даем выбрать какие загрузить
-            file_choices = [os.path.basename(f) for f in txt_files]
-            selected = questionary.checkbox(
-                "Выберите части для загрузки (нужно минимум M штук):",
-                choices=file_choices,
-                style=ui_manager.custom_style
-            ).ask()
-            
-            if not selected or len(selected) < 2:
-                print_error("Выберите минимум 2 части.")
-                input("\nНажмите Enter...")
-                return
-            
-            for fname in selected:
-                fpath = os.path.join(chosen_dir, fname)
-                with open(fpath, "r", encoding="utf-8") as f:
-                    content = f.read()
-                # Берем последнюю непустую строку (сама доля идет после заголовка)
-                lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
-                if lines:
-                    shares_input.append(lines[-1])
+            if "txt" in source:
+                # Ищем папки shamir_* в CSV_DIR
+                shamir_dirs = sorted(glob.glob(os.path.join(CSV_DIR, "shamir_*")))
+                if not shamir_dirs:
+                    print_error(f"Нет папок shamir_* в {CSV_DIR}")
+                    time.sleep(1)
+                    continue
                     
-            print_info(f"Загружено {len(shares_input)} частей из файлов.")
-            
-        elif "enc" in source:
-            # Ищем папки shamir_* в ENC_DIR
-            shamir_dirs = sorted(glob.glob(os.path.join(ENC_DIR, "shamir_*")))
-            if not shamir_dirs:
-                print_error(f"Нет папок shamir_* в {ENC_DIR}")
-                input("\nНажмите Enter...")
-                return
-                
-            dir_choice = questionary.select(
-                "Выберите папку с зашифрованными частями:",
-                choices=[os.path.basename(d) for d in shamir_dirs],
-                style=ui_manager.custom_style
-            ).ask()
-            if not dir_choice:
-                input("\nНажмите Enter...")
-                return
-                
-            chosen_dir = os.path.join(ENC_DIR, dir_choice)
-            enc_files = sorted(glob.glob(os.path.join(chosen_dir, "*.enc")))
-            
-            if not enc_files:
-                print_error("Папка не содержит .enc файлов.")
-                input("\nНажмите Enter...")
-                return
-            
-            file_choices = [os.path.basename(f) for f in enc_files]
-            selected = questionary.checkbox(
-                "Выберите части для расшифровки (нужно минимум M штук):",
-                choices=file_choices,
-                style=ui_manager.custom_style
-            ).ask()
-            
-            if not selected or len(selected) < 2:
-                print_error("Выберите минимум 2 части.")
-                input("\nНажмите Enter...")
-                return
-            
-            pwd = questionary.password("Пароль для расшифровки:", style=ui_manager.custom_style).ask()
-            if not pwd:
-                print_error("Пароль не указан.")
-                input("\nНажмите Enter...")
-                return
-            
-            for fname in selected:
-                fpath = os.path.join(chosen_dir, fname)
-                try:
-                    data = decrypt_data(fpath, pwd)
-                    if data and len(data) > 0:
-                        shares_input.append(data[0]["data"])
-                except Exception as e:
-                    print_error(f"Ошибка расшифровки {fname}: {e}")
-                    
-            print_info(f"Расшифровано и загружено {len(shares_input)} частей.")
-            
-        elif "путь" in source.lower():
-            # Произвольная папка
-            print_info("⚠ В папке желательно чтобы находились ТОЛЬКО файлы частей (shares).")
-            folder_path = questionary.text(
-                "Введите полный путь к папке с частями:",
-                style=ui_manager.custom_style
-            ).ask()
-            
-            if not folder_path or not os.path.isdir(folder_path):
-                print_error("Папка не найдена или путь неверный.")
-                input("\nНажмите Enter...")
-                return
-            
-            # Ищем .txt и .enc файлы
-            all_txt = sorted(glob.glob(os.path.join(folder_path, "*.txt")))
-            all_enc = sorted(glob.glob(os.path.join(folder_path, "*.enc")))
-            
-            if not all_txt and not all_enc:
-                print_error("В указанной папке нет .txt или .enc файлов.")
-                input("\nНажмите Enter...")
-                return
-            
-            if all_txt and all_enc:
-                file_type = questionary.select(
-                    "В папке найдены и .txt и .enc файлы. Что загрузить?",
-                    choices=["📄 Текстовые (.txt)", "🔒 Зашифрованные (.enc)"],
+                dir_choice = questionary.select(
+                    "Выберите папку с частями:",
+                    choices=["🔙 Назад"] + [os.path.basename(d) for d in shamir_dirs],
                     style=ui_manager.custom_style
                 ).ask()
-                if not file_type:
-                    input("\nНажмите Enter...")
-                    return
-                target_files = all_txt if "txt" in file_type else all_enc
-                is_enc = "enc" in file_type
-            elif all_enc:
-                target_files = all_enc
-                is_enc = True
-            else:
-                target_files = all_txt
-                is_enc = False
-            
-            file_choices = [os.path.basename(f) for f in target_files]
-            selected = questionary.checkbox(
-                "Выберите части для загрузки (минимум M штук):",
-                choices=file_choices,
-                style=ui_manager.custom_style
-            ).ask()
-            
-            if not selected or len(selected) < 2:
-                print_error("Выберите минимум 2 части.")
-                input("\nНажмите Enter...")
-                return
-            
-            if is_enc:
-                pwd = questionary.password("Пароль для расшифровки:", style=ui_manager.custom_style).ask()
-                if not pwd:
-                    print_error("Пароль не указан.")
-                    input("\nНажмите Enter...")
-                    return
+                if not dir_choice or "Назад" in dir_choice:
+                    continue
+                    
+                chosen_dir = os.path.join(CSV_DIR, dir_choice)
+                txt_files = sorted(glob.glob(os.path.join(chosen_dir, "*.txt")))
+                
+                if not txt_files:
+                    print_error("Папка не содержит .txt файлов.")
+                    time.sleep(1)
+                    continue
+                
+                # Показываем найденные файлы, даем выбрать какие загрузить
+                file_choices = [os.path.basename(f) for f in txt_files]
+                selected = questionary.checkbox(
+                    "Выберите части для загрузки (нужно минимум M штук):",
+                    choices=file_choices,
+                    style=ui_manager.custom_style
+                ).ask()
+                
+                if not selected or len(selected) < 2:
+                    print_error("Выберите минимум 2 части.")
+                    time.sleep(1)
+                    continue
+                
                 for fname in selected:
-                    fpath = os.path.join(folder_path, fname)
+                    fpath = os.path.join(chosen_dir, fname)
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    # Берем последнюю непустую строку (сама доля идет после заголовка)
+                    lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
+                    if lines:
+                        shares_input.append(lines[-1])
+                        
+                print_info(f"Загружено {len(shares_input)} частей из файлов.")
+                
+            elif "enc" in source:
+                # Ищем папки shamir_* в ENC_DIR
+                shamir_dirs = sorted(glob.glob(os.path.join(ENC_DIR, "shamir_*")))
+                if not shamir_dirs:
+                    print_error(f"Нет папок shamir_* в {ENC_DIR}")
+                    time.sleep(1)
+                    continue
+                    
+                dir_choice = questionary.select(
+                    "Выберите папку с зашифрованными частями:",
+                    choices=["🔙 Назад"] + [os.path.basename(d) for d in shamir_dirs],
+                    style=ui_manager.custom_style
+                ).ask()
+                if not dir_choice or "Назад" in dir_choice:
+                    continue
+                    
+                chosen_dir = os.path.join(ENC_DIR, dir_choice)
+                enc_files = sorted(glob.glob(os.path.join(chosen_dir, "*.enc")))
+                
+                if not enc_files:
+                    print_error("Папка не содержит .enc файлов.")
+                    time.sleep(1)
+                    continue
+                
+                file_choices = [os.path.basename(f) for f in enc_files]
+                selected = questionary.checkbox(
+                    "Выберите части для расшифровки (нужно минимум M штук):",
+                    choices=file_choices,
+                    style=ui_manager.custom_style
+                ).ask()
+                
+                if not selected or len(selected) < 2:
+                    print_error("Выберите минимум 2 части.")
+                    time.sleep(1)
+                    continue
+                
+                pwd = questionary.password("Пароль для расшифровки:", style=ui_manager.custom_style).ask()
+                
+                if pwd is None:
+                    import time
+                    from ui_manager import console
+                    console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору источника...[/yellow]")
+                    time.sleep(1)
+                    console.clear()
+                    continue
+                    
+                if not pwd:
+                    print_error("Данные не введены (Пароль не указан).")
+                    time.sleep(1)
+                    continue
+                
+                for fname in selected:
+                    fpath = os.path.join(chosen_dir, fname)
                     try:
                         data = decrypt_data(fpath, pwd)
                         if data and len(data) > 0:
                             shares_input.append(data[0]["data"])
                     except Exception as e:
                         print_error(f"Ошибка расшифровки {fname}: {e}")
-            else:
-                for fname in selected:
-                    fpath = os.path.join(folder_path, fname)
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
-                    if lines:
-                        shares_input.append(lines[-1])
-            
-            print_info(f"Загружено {len(shares_input)} частей из {folder_path}")
-
-        else:
-            # Ручной ввод
-            print_info("Введите части по одной. Закончите ввод пустой строкой.")
-            i = 1
-            while True:
-                s = questionary.text(f"Введите часть {i} (или Enter для завершения):", style=ui_manager.custom_style).ask()
-                if not s:
-                    break
-                s = s.strip()
-                if s:
-                    shares_input.append(s)
-                    i += 1
+                        
+                print_info(f"Расшифровано и загружено {len(shares_input)} частей.")
                 
-        if len(shares_input) < 2:
-            print_error("Для восстановления нужно минимум 2 части.")
-            input("\nНажмите Enter...")
-            return
+            elif "путь" in source.lower():
+                # Произвольная папка
+                print_info("⚠ В папке желательно чтобы находились ТОЛЬКО файлы частей (shares).")
+                folder_path = questionary.text(
+                    "Введите полный путь к папке с частями:",
+                    style=ui_manager.custom_style
+                ).ask()
+                
+                if folder_path is None:
+                    import time
+                    from ui_manager import console
+                    console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору источника...[/yellow]")
+                    time.sleep(1)
+                    console.clear()
+                    continue
+                    
+                if not folder_path or not os.path.isdir(folder_path):
+                    print_error("Данные не введены или путь неверный.")
+                    time.sleep(1)
+                    continue
+                    
+                # Ищем .txt и .enc файлы
+                all_txt = sorted(glob.glob(os.path.join(folder_path, "*.txt")))
+                all_enc = sorted(glob.glob(os.path.join(folder_path, "*.enc")))
+                
+                if not all_txt and not all_enc:
+                    print_error("В указанной папке нет .txt или .enc файлов.")
+                    time.sleep(1)
+                    continue
+                
+                if all_txt and all_enc:
+                    file_type = questionary.select(
+                        "В папке найдены и .txt и .enc файлы. Что загрузить?",
+                        choices=["📄 Текстовые (.txt)", "🔒 Зашифрованные (.enc)"],
+                        style=ui_manager.custom_style
+                    ).ask()
+                    if not file_type:
+                        continue
+                    target_files = all_txt if "txt" in file_type else all_enc
+                    is_enc = "enc" in file_type
+                elif all_enc:
+                    target_files = all_enc
+                    is_enc = True
+                else:
+                    target_files = all_txt
+                    is_enc = False
+                
+                file_choices = [os.path.basename(f) for f in target_files]
+                selected = questionary.checkbox(
+                    "Выберите части для загрузки (минимум M штук):",
+                    choices=file_choices,
+                    style=ui_manager.custom_style
+                ).ask()
+                
+                if not selected or len(selected) < 2:
+                    print_error("Выберите минимум 2 части.")
+                    time.sleep(1)
+                    continue
+                
+                if is_enc:
+                    pwd = questionary.password("Пароль для расшифровки:", style=ui_manager.custom_style).ask()
+                    
+                    if pwd is None:
+                        import time
+                        from ui_manager import console
+                        console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору источника...[/yellow]")
+                        time.sleep(1)
+                        console.clear()
+                        continue
+                        
+                    if not pwd:
+                        print_error("Данные не введены (Пароль не указан).")
+                        time.sleep(1)
+                        continue
+                    for fname in selected:
+                        fpath = os.path.join(folder_path, fname)
+                        try:
+                            data = decrypt_data(fpath, pwd)
+                            if data and len(data) > 0:
+                                shares_input.append(data[0]["data"])
+                        except Exception as e:
+                            print_error(f"Ошибка расшифровки {fname}: {e}")
+                else:
+                    for fname in selected:
+                        fpath = os.path.join(folder_path, fname)
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
+                        if lines:
+                            shares_input.append(lines[-1])
+                
+                print_info(f"Загружено {len(shares_input)} частей из {folder_path}")
+
+            else:
+                # Ручной ввод
+                print_info("Введите части по одной. Закончите ввод пустой строкой.")
+                i = 1
+                cancelled = False
+                while True:
+                    s = questionary.text(f"Введите часть {i} (пустая строка для завершения):", style=ui_manager.custom_style).ask()
+                    if s is None:
+                        cancelled = True
+                        break
+                    if not s:
+                        break
+                    s = s.strip()
+                    if s:
+                        shares_input.append(s)
+                        i += 1
+                if cancelled:
+                    import time
+                    from ui_manager import console
+                    console.print("\n[yellow]⚠ Действие отменено (Ctrl+C). Возврат к выбору источника...[/yellow]")
+                    time.sleep(1)
+                    console.clear()
+                    continue
+                    
+            if len(shares_input) < 2:
+                print_error("Для восстановления нужно минимум 2 части.")
+                time.sleep(1)
+                continue
+                
+            try:
+                secret = combine_shares(shares_input)
+                console.print()
+                print_success("✅ Секрет успешно восстановлен!")
+                console.print()
+                console.print(f"[bold magenta]Секрет:[/] [white]{secret}[/]")
+                console.print()
+            except Exception as e:
+                print_error(f"Не удалось восстановить секрет: {e}")
+                
+            break
             
-        try:
-            secret = combine_shares(shares_input)
-            console.print()
-            print_success("✅ Секрет успешно восстановлен!")
-            console.print()
-            console.print(f"[bold magenta]Секрет:[/] [white]{secret}[/]")
-            console.print()
-        except Exception as e:
-            print_error(f"Не удалось восстановить секрет: {e}")
-            
-    input("\nНажмите Enter...")
+    
+    console.print()
+    post_act = questionary.select(
+        "Что делать дальше?",
+        choices=["🔙 Назад (к меню Shamir)", "🏠 В главное меню"],
+        style=ui_manager.custom_style
+    ).ask()
+    
+    if not post_act or "Назад" in post_act:
+        return False
+    return True

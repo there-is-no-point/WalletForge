@@ -13,7 +13,6 @@
   * `vanity_gen.py` — Vanity-генератор адресов (мульти-паттерн, ETA, мультипроцессинг).
   * `shamir_utils.py` — Shamir Secret Sharing (разделение/восстановление секретов).
   * `pdf_export.py` — Экспорт кошельков в QR PDF и Paper Wallet PDF.
-  * `add_network.py` — Wizard для создания модулей сетей.
 * `networks/` — Папка с модулями генераторов. Каждый `.py` файл — отдельная сеть.
 * `requirements.txt` — Список зависимостей.
 
